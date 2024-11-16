@@ -1,0 +1,24 @@
+# Ignore environment variable file
+.env
+
+# Node.js dependencies
+node_modules/
+uploads
+# Logs
+*.log
+
+# Dependency directories
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Optional: Build output (if you have any)
+dist/
+
+# Optional: Coverage reports
+coverage/
+
+# IDE-specific files
+.vscode/
+.idea/
+.DS_Store
