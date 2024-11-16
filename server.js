@@ -196,8 +196,8 @@ app.use(express.static(path.join(__dirname, "build")));
 
 // Hardcoded superadmin credentials (you can change these)
 const superAdminCredentials = {
-  email: "superadmin@gmail.com",
-  password: "superadmin", // Replace with a real password in production
+  email: process.env.SUPER_USER,
+  password: process.env.SUPER_PASSWORD, // Replace with a real password in production
 };
 
 // Login Route
