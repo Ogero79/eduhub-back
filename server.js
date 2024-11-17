@@ -1,13 +1,12 @@
-require('dotenv').config();
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const session = require("express-session");
+const jwt = require("jsonwebtoken");
 const pg = require("pg");
 const bcrypt = require("bcryptjs");
 const path = require("path");
-const app = express();
 const multer = require("multer");
-const router = express.Router();
+const app = express();
 const PORT = 5000;
 
 // Initialize database pool
@@ -32,11 +31,10 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Check if the origin is in the allowed list
       if (allowedOrigins.includes(origin) || !origin) {
-        callback(null, true);  // Allow the request
+        callback(null, true);
       } else {
-        callback(new Error('Not allowed by CORS'), false); // Reject the request
+        callback(new Error("Not allowed by CORS"), false);
       }
     },
     methods: ["GET", "POST", "DELETE", "PUT", "PATCH"],
@@ -44,102 +42,110 @@ app.use(
   })
 );
 
-const isProduction = process.env.NODE_ENV === 'production'; 
+// JWT middleware to verify tokens
+const authenticateToken = (req, res, next) => {
+  const token = req.headers["authorization"]?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Unauthorized" });
 
-app.use(
-  session({
-    secret: process.env.SECRET_KEY, // Session secret key
-    resave: false,
-    saveUninitialized: true,
-    cookie: {
-      httpOnly: true, // Prevent access via JavaScript
-      secure: isProduction, // Set to true for HTTPS (in production)
-    },
-  })
-);
-// Logout route to destroy session
-app.post("/logout", (req, res) => {
-  req.session.destroy((err) => {
-    if (err) {
-      return res.status(500).send({ message: "Error logging out." });
-    }
-    res.clearCookie("connect.sid"); // Remove the session cookie
-    res.status(200).send({ message: "Logged out successfully" });
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ message: "Forbidden" });
+    req.user = user;
+    next();
   });
-});
+};
 
 // Configure Multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "./uploads"); // Change this path as per your preference
+    cb(null, "./uploads");
   },
   filename: (req, file, cb) => {
     cb(null, file.originalname);
-
   },
 });
 
 const upload = multer({ storage });
 
 // Create a resource route
+app.post(
+  "/admin/add-resource",
+  authenticateToken,
+  upload.single("file"),
+  async (req, res) => {
+    const {
+      title,
+      description,
+      year,
+      semester,
+      course,
+      unitCode,
+      resourceType,
+    } = req.body;
+    const fileUrl = req.file ? req.file.path : null;
+    const fileType = path.extname(req.file.originalname).substring(1);
 
-app.post("/admin/add-resource", upload.single("file"), async (req, res) => {
-  const { title, description, year, semester, course, unitCode, resourceType } =
-    req.body;
-  const fileUrl = req.file ? req.file.path : null; // If file exists, get its path
-  const fileType = path.extname(req.file.originalname).substring(1);
-
-  try {
-    // Insert the resource into the database
-    await pool.query(
-      "INSERT INTO resources (title, description, year, semester, course, unitcode, filetype, resource_type, file_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-      [
-        title,
-        description,
-        year,
-        semester,
-        course,
-        unitCode,
-        fileType,
-        resourceType,
-        fileUrl,
-      ]
-    );
-    res.json({ message: "Resource added successfully!" });
-  } catch (err) {
-    console.error("Error adding resource:", err);
-    res.status(500).json({ message: "Error adding resource" });
+    try {
+      await pool.query(
+        "INSERT INTO resources (title, description, year, semester, course, unitcode, filetype, resource_type, file_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+        [
+          title,
+          description,
+          year,
+          semester,
+          course,
+          unitCode,
+          fileType,
+          resourceType,
+          fileUrl,
+        ]
+      );
+      res.json({ message: "Resource added successfully!" });
+    } catch (err) {
+      console.error("Error adding resource:", err);
+      res.status(500).json({ message: "Error adding resource" });
+    }
   }
-});
+);
 
-app.post("/classrep/add-resource", upload.single("file"), async (req, res) => {
-  const { title, description, year, semester, course, unitCode, resourceType } =
-    req.body;
-  const fileUrl = req.file ? req.file.path : null; // If file exists, get its path
-  const fileType = path.extname(req.file.originalname).substring(1);
+app.post(
+  "/classrep/add-resource",
+  authenticateToken,
+  upload.single("file"),
+  async (req, res) => {
+    const {
+      title,
+      description,
+      year,
+      semester,
+      course,
+      unitCode,
+      resourceType,
+    } = req.body;
+    const fileUrl = req.file ? req.file.path : null;
+    const fileType = path.extname(req.file.originalname).substring(1);
 
-  try {
-    // Insert the resource into the database
-    await pool.query(
-      "INSERT INTO resources (title, description, year, semester, course, unitcode, filetype, resource_type, file_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-      [
-        title,
-        description,
-        year,
-        semester,
-        course,
-        unitCode,
-        fileType,
-        resourceType,
-        fileUrl,
-      ]
-    );
-    res.json({ message: "Resource added successfully!" });
-  } catch (err) {
-    console.error("Error adding resource:", err);
-    res.status(500).json({ message: "Error adding resource" });
+    try {
+      await pool.query(
+        "INSERT INTO resources (title, description, year, semester, course, unitcode, filetype, resource_type, file_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+        [
+          title,
+          description,
+          year,
+          semester,
+          course,
+          unitCode,
+          fileType,
+          resourceType,
+          fileUrl,
+        ]
+      );
+      res.json({ message: "Resource added successfully!" });
+    } catch (err) {
+      console.error("Error adding resource:", err);
+      res.status(500).json({ message: "Error adding resource" });
+    }
   }
-});
+);
 
 // Register Route
 app.post("/register", async (req, res) => {
@@ -155,7 +161,6 @@ app.post("/register", async (req, res) => {
   } = req.body;
 
   try {
-    // Check if the email already exists
     const result = await pool.query("SELECT * FROM students WHERE email = $1", [
       email,
     ]);
@@ -163,10 +168,8 @@ app.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Email already in use" });
     }
 
-    // Hash the password before storing it
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Insert the new student into the database, including the course
     const insertQuery = `
       INSERT INTO students (email, password, first_name, last_name, year, semester, course, gender)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -191,15 +194,6 @@ app.post("/register", async (req, res) => {
   }
 });
 
-// Serve static files in production (e.g., React build)
-app.use(express.static(path.join(__dirname, "build")));
-
-// Hardcoded superadmin credentials (you can change these)
-const superAdminCredentials = {
-  email: process.env.SUPER_USER,
-  password: process.env.SUPER_PASSWORD, // Replace with a real password in production
-};
-
 // Login Route
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
@@ -212,13 +206,18 @@ app.post("/login", async (req, res) => {
 
     // Check if login is for superadmin
     if (
-      email === superAdminCredentials.email &&
-      password === superAdminCredentials.password
+      email === process.env.SUPER_USER &&
+      password === process.env.SUPER_PASSWORD
     ) {
-      req.session.userId = email; // Store superadmin session
-      req.session.role = "superadmin"; // Superadmin role
+      const token = jwt.sign(
+        { email, role: "superadmin" }, // Payload containing user info
+        process.env.JWT_SECRET, // Secret key to sign the JWT
+        { expiresIn: "1h" } // Token expiration (1 hour)
+      );
+
       return res.json({
         message: "Login successful",
+        token, // Return the JWT token
         redirectTo: "/superadmin",
       });
     }
@@ -236,16 +235,24 @@ app.post("/login", async (req, res) => {
       );
 
       if (isClassRepPasswordValid) {
-        req.session.userId = classRep.id;
-        req.session.firstName = classRep.first_name;
-        req.session.lastName = classRep.last_name;
-        req.session.role = "classRep";
-        req.session.course = classRep.course;
-        req.session.email = classRep.email;
-        req.session.year = classRep.year;
-        req.session.semester = classRep.semester;
+        const token = jwt.sign(
+          {
+            id: classRep.id,
+            role: "classRep",
+            email: classRep.email,
+            firstName: classRep.first_name,
+            lastName: classRep.last_name,
+            year: classRep.year,
+            course: classRep.course,
+            semester: classRep.semester,
+          },
+          process.env.JWT_SECRET,
+          { expiresIn: "1h" }
+        );
+
         return res.json({
           message: "Login successful",
+          token,
           redirectTo: "/classrep/dashboard",
         });
       } else {
@@ -266,14 +273,21 @@ app.post("/login", async (req, res) => {
       );
 
       if (isAdminPasswordValid) {
-        req.session.userId = admin.id;
-        req.session.firstName = admin.first_name;
-        req.session.lastName = admin.last_name;
-        req.session.email = admin.email;
-    
-        req.session.role = "admin";
+        const token = jwt.sign(
+          {
+            id: admin.id,
+            role: "admin",
+            email: admin.email,
+            firstName: admin.first_name,
+            lastName: admin.last_name,
+          },
+          process.env.JWT_SECRET,
+          { expiresIn: "1h" }
+        );
+
         return res.json({
           message: "Login successful",
+          token,
           redirectTo: "/admin/dashboard",
         });
       } else {
@@ -294,17 +308,24 @@ app.post("/login", async (req, res) => {
       );
 
       if (isStudentPasswordValid) {
-        req.session.userId = student.id;
-        req.session.role = "student";
-        req.session.firstName = student.first_name;
-        req.session.lastName = student.last_name;
-        req.session.email = student.email;
-        req.session.course = student.course;
-        req.session.year = student.year;
-        req.session.semester = student.semester;
+        const token = jwt.sign(
+          {
+            id: student.id,
+            role: "student",
+            email: student.email,
+            firstName: student.first_name,
+            lastName: student.last_name,
+            course: student.course,
+            year: student.year,
+            semester: student.semester,
+          },
+          process.env.JWT_SECRET,
+          { expiresIn: "1h" }
+        );
 
         return res.json({
           message: "Login successful",
+          token,
           redirectTo: "/dashboard",
         });
       } else {
@@ -386,70 +407,135 @@ app.post("/superadmin/create-class-rep", async (req, res) => {
 
 // Generic Role Check Route
 app.get("/user/check", (req, res) => {
-  const { role } = req.session; // Extract role from session
-  if (["admin", "superadmin", "classRep", "student"].includes(role)) {
-    return res.json({ role }); // Return the role if valid
-  } else {
-    return res.status(403).json({ message: "Forbidden" }); // Return 403 if role is invalid
+  // Get the token from the Authorization header
+  const token = req.headers["authorization"]?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
+  }
+
+  try {
+    // Verify the token using the JWT_SECRET
+    const decoded = jwt.verify(token, process.env.JWT_SECRET); // This will decode the payload
+
+    // Check if the role is valid
+    if (["admin", "superadmin", "classRep", "student"].includes(decoded.role)) {
+      return res.json({ role: decoded.role }); // Return the role if valid
+    } else {
+      return res.status(403).json({ message: "Forbidden" }); // Return 403 if role is invalid
+    }
+  } catch (err) {
+    console.error("Error verifying token:", err);
+    return res.status(401).json({ message: "Invalid token or expired token" });
   }
 });
 
-// Normal User Dashboard Route (Protected)
 app.get("/dashboard", (req, res) => {
-  if (req.session.role !== "student") {
-    return res
-      .status(403)
-      .json({ message: "Access denied. You are not logged in as a student." });
+  // Extract the token from the Authorization header
+  const token = req.headers["authorization"]?.split(" ")[1]; // 'Bearer <token>'
+
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
   }
-  res.json({
-    message: `Welcome to the student dashboard, ${req.session.firstName}!`,
+
+  // Verify the JWT token
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ message: "Invalid or expired token" });
+    }
+
+    // Check if the role in the token is "student"
+    if (decoded.role !== "student") {
+      return res.status(403).json({
+        message: "Access denied. You are not logged in as a student.",
+      });
+    }
+
+    // If valid, send a response with user info (decoded token)
+    res.json({
+      message: `Welcome to the student dashboard, ${decoded.firstName}!`,
+    });
   });
 });
 
 // Super Admin Dashboard Route (Protected)
 app.get("/superadmin/dashboard", (req, res) => {
-  if (req.session.role !== "superadmin") {
-    return res
-      .status(403)
-      .json({ message: "Access denied. You are not a superadmin." });
-  }
-  res.json({ message: "Welcome to the Super Admin Dashboard!" });
-});
+  // Extract token from Authorization header
+  const token = req.headers["authorization"]?.split(" ")[1]; // 'Bearer <token>'
 
-// Normal User Dashboard Route (Protected)
-app.get("/dashboard", (req, res) => {
-  if (req.session.year !== "student") {
-    return res
-      .status(403)
-      .json({ message: "Access denied. You are not logged in as a student." });
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
   }
-  res.json({
-    message: `Welcome to the student dashboard, ${req.session.firstName}!`,
+
+  // Verify the JWT token
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ message: "Invalid or expired token" });
+    }
+
+    // Check if the role is "superadmin"
+    if (decoded.role !== "superadmin") {
+      return res
+        .status(403)
+        .json({ message: "Access denied. You are not a superadmin." });
+    }
+
+    // If valid, send a success response
+    res.json({ message: "Welcome to the Super Admin Dashboard!" });
   });
 });
 
-// Normal User Dashboard Route (Protected)
 app.get("/classrep/dashboard", (req, res) => {
-  if (req.session.role !== "classRep") {
-    return res
-      .status(403)
-      .json({
-        message: "Access denied. You are not logged in as a class REP.",
-      });
+  // Extract token from Authorization header
+  const token = req.headers["authorization"]?.split(" ")[1]; // 'Bearer <token>'
+
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
   }
-  res.json({
-    message: `Welcome to the class rep dashboard, ${req.session.firstName}!`,
+
+  // Verify the JWT token
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ message: "Invalid or expired token" });
+    }
+
+    // Check if the user role is classRep
+    if (decoded.role !== "classRep") {
+      return res.status(403).json({
+        message: "Access denied. You are not logged in as a class rep.",
+      });
+    }
+
+    res.json({
+      message: `Welcome to the class rep dashboard, ${decoded.firstName}!`,
+    });
   });
 });
-// Normal User Dashboard Route (Protected)
+
 app.get("/admin/dashboard", (req, res) => {
-  if (req.session.role !== "admin") {
-    return res
-      .status(403)
-      .json({ message: "Access denied. You are not logged in as an admin." });
+  // Extract token from Authorization header
+  const token = req.headers["authorization"]?.split(" ")[1]; // 'Bearer <token>'
+
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
   }
-  res.json({
-    message: `Welcome to the admin dashboard, ${req.session.firstName}!`,
+
+  // Verify the JWT token
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ message: "Invalid or expired token" });
+    }
+
+    // Check if the user role is admin
+    if (decoded.role !== "admin") {
+      return res.status(403).json({
+        message: "Access denied. You are not logged in as an admin.",
+      });
+    }
+
+    res.json({
+      message: `Welcome to the admin dashboard, ${decoded.firstName}!`,
+    });
   });
 });
 
@@ -545,228 +631,173 @@ app.get("/superadmin/resources", async (req, res) => {
 });
 
 app.get("/student/recent-resources", async (req, res) => {
-  const year = req.session.year;
-  const course = req.session.course;
-  const semester = req.session.semester;
+  // Extract token from Authorization header
+  const token = req.headers["authorization"]?.split(" ")[1]; // 'Bearer <token>'
 
-  try {
-    // Query to get all resources
-    const resourcesResult = await pool.query(
-      "SELECT * FROM resources WHERE course = $1 AND year = $2 AND semester = $3 ORDER BY created_at DESC LIMIT 4",
-      [course, year, semester]
-    );
-    const resources = resourcesResult.rows;
-
-    // Send the list of resources to the frontend
-    res.json({ resources });
-  } catch (err) {
-    console.error("Error fetching resources:", err);
-    res.status(500).json({ message: "Error fetching resources" });
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
   }
+
+  // Verify the JWT token
+  jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ message: "Invalid or expired token" });
+    }
+
+    // Get user details from the decoded token
+    const { year, course, semester } = decoded;
+
+    try {
+      // Query to get all resources based on user's year, course, and semester
+      const resourcesResult = await pool.query(
+        "SELECT * FROM resources WHERE course = $1 AND year = $2 AND semester = $3 ORDER BY created_at DESC LIMIT 4",
+        [course, year, semester]
+      );
+      const resources = resourcesResult.rows;
+
+      // Send the list of resources to the frontend
+      res.json({ resources });
+    } catch (err) {
+      console.error("Error fetching resources:", err);
+      res.status(500).json({ message: "Error fetching resources" });
+    }
+  });
 });
-// Route to fetch user data based on the session
+
 app.get("/user/profile", (req, res) => {
-  // Retrieve user data from session
-  const firstName = req.session.firstName;
-  const lastName = req.session.lastName;
-  const email = req.session.email;
-  const course = req.session.course;
-  const year = req.session.year;
-  const semester = req.session.semester;
-  const role = req.session.role;
+  // Extract token from Authorization header
+  const token = req.headers["authorization"]?.split(" ")[1]; // 'Bearer <token>'
 
-  try {
-    // Return the session data as a response
-    res.json({
-      firstName,
-      lastName,
-      email,
-      course,
-      year,
-      semester,
-      role,
-    });
-  } catch (err) {
-    console.error("Error fetching user data:", err);
-    res.status(500).json({ message: "Error fetching user data" });
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
   }
+
+  // Verify the JWT token
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ message: "Invalid or expired token" });
+    }
+
+    // Extract user data from the decoded token
+    const { firstName, lastName, email, course, year, semester, role } =
+      decoded;
+
+    try {
+      // Return the user profile data
+      res.json({
+        firstName,
+        lastName,
+        email,
+        course,
+        year,
+        semester,
+        role,
+      });
+    } catch (err) {
+      console.error("Error fetching user profile:", err);
+      res.status(500).json({ message: "Error fetching user profile" });
+    }
+  });
 });
 
-
-// Route to update user profile
 app.put("/user/profile", async (req, res) => {
-  const { email, role } = req.session; // User's email and role from session
-  const { firstName, lastName, course, year, semester } = req.body;
+  // Extract the token from the Authorization header
+  const token = req.headers["authorization"]?.split(" ")[1]; // 'Bearer <token>'
 
-  if (!email) {
+  if (!token) {
     return res.status(401).json({ message: "User not logged in" });
   }
 
-  // Map roles to their corresponding tables and update logic
-  const roleConfig = {
-    student: {
-      table: "students",
-      columns: "first_name = $1, last_name = $2, course = $3, year = $4, semester = $5",
-      values: [firstName, lastName, course, year, semester, email],
-    },
-    classRep: {
-      table: "class_representatives",
-      columns: "first_name = $1, last_name = $2, course = $3, year = $4, semester = $5",
-      values: [firstName, lastName, course, year, semester, email],
-    },
-    admin: {
-      table: "admins",
-      columns: "first_name = $1, last_name = $2",
-      values: [firstName, lastName, email], // Admins might not need course/year/semester
-    },
-  };
-
-  const config = roleConfig[role];
-  if (!config) {
-    return res.status(403).json({ message: "Unauthorized role" });
-  }
-
-  try {
-    const query = `
-      UPDATE ${config.table}
-      SET ${config.columns}
-      WHERE email = $${config.values.length}
-      RETURNING *;
-    `;
-
-    const result = await pool.query(query, config.values);
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ message: "User not found" });
+  // Verify the JWT token
+  jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ message: "Invalid or expired token" });
     }
 
-    // Update session with new data
-    req.session.firstName = firstName;
-    req.session.lastName = lastName;
+    const { email, role } = decoded; // Get email and role from the decoded token
+    const { firstName, lastName, course, year, semester } = req.body;
 
-    if (role !== "admin") {
-      req.session.course = course;
-      req.session.year = year;
-      req.session.semester = semester;
+    // Map roles to their corresponding tables and update logic
+    const roleConfig = {
+      student: {
+        table: "students",
+        columns:
+          "first_name = $1, last_name = $2, course = $3, year = $4, semester = $5",
+        values: [firstName, lastName, course, year, semester, email],
+      },
+      classRep: {
+        table: "class_representatives",
+        columns:
+          "first_name = $1, last_name = $2, course = $3, year = $4, semester = $5",
+        values: [firstName, lastName, course, year, semester, email],
+      },
+      admin: {
+        table: "admins",
+        columns: "first_name = $1, last_name = $2",
+        values: [firstName, lastName, email], // Admins might not need course/year/semester
+      },
+    };
+
+    const config = roleConfig[role];
+    if (!config) {
+      return res.status(403).json({ message: "Unauthorized role" });
     }
 
-    res.json({ message: "Profile updated successfully", user: result.rows[0] });
-  } catch (err) {
-    console.error("Error updating profile:", err);
-    res.status(500).json({ message: "Error updating profile" });
-  }
+    try {
+      const query = `
+        UPDATE ${config.table}
+        SET ${config.columns}
+        WHERE email = $${config.values.length}
+        RETURNING *;
+      `;
+
+      const result = await pool.query(query, config.values);
+
+      if (result.rowCount === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Return updated user data (no need to update session)
+      res.json({
+        message: "Profile updated successfully",
+        user: result.rows[0],
+      });
+    } catch (err) {
+      console.error("Error updating profile:", err);
+      res.status(500).json({ message: "Error updating profile" });
+    }
+  });
 });
 
+const verifyToken = (token) => {
+  return new Promise((resolve, reject) => {
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+      if (err) return reject(err);
+      resolve(decoded);
+    });
+  });
+};
 
+// Route to fetch notes resources
 app.get("/student/notes-resources", async (req, res) => {
-  const year = req.session.year;
-  const course = req.session.course;
-  const semester = req.session.semester;
-  try {
-    // Query to get all resources
-    const resourcesResult = await pool.query(
-      "SELECT * FROM resources WHERE resource_type = $1 AND course = $2 AND year = $3 AND semester = $4 ORDER BY created_at DESC LIMIT 4",
-      ["Notes", course, year, semester]
-    );
+  const token = req.headers["authorization"]?.split(" ")[1];
 
-    const resources = resourcesResult.rows;
-
-    // Send both the total count and the list of resources to the frontend
-    res.json({
-      resources,
-    });
-  } catch (err) {
-    console.error("Error fetching resources:", err);
-    res.status(500).json({ message: "Error fetching resources" });
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
   }
-});
 
-app.get("/student/all-notes-resources", async (req, res) => {
-  const year = req.session.year;
-  const course = req.session.course;
-  const semester = req.session.semester;
   try {
-    // Query to get all resources
-    const resourcesResult = await pool.query(
-      "SELECT * FROM resources WHERE resource_type = $1 AND course = $2 AND year = $3 AND semester = $4 ORDER BY created_at DESC",
-      ["Notes", course, year, semester]
-    );
+    const decoded = await verifyToken(token);
+    const { year, course, semester } = decoded;
 
-    const resources = resourcesResult.rows;
-
-    // Send both the total count and the list of resources to the frontend
-    res.json({
-      resources,
-    });
-  } catch (err) {
-    console.error("Error fetching resources:", err);
-    res.status(500).json({ message: "Error fetching resources" });
-  }
-});
-
-app.get("/student/all-papers-resources", async (req, res) => {
-  const year = req.session.year;
-  const course = req.session.course;
-  const semester = req.session.semester;
-  try {
-    // Query to get all resources
-    const resourcesResult = await pool.query(
-      "SELECT * FROM resources WHERE resource_type = $1 AND course = $2 AND year = $3 AND semester = $4 ORDER BY created_at DESC",
-      ["Past Paper", course, year, semester]
-    );
-
-    const resources = resourcesResult.rows;
-
-    // Send both the total count and the list of resources to the frontend
-    res.json({
-      resources,
-    });
-  } catch (err) {
-    console.error("Error fetching resources:", err);
-    res.status(500).json({ message: "Error fetching resources" });
-  }
-});
-
-app.get("/student/all-tasks-resources", async (req, res) => {
-  const year = req.session.year;
-  const course = req.session.course;
-  const semester = req.session.semester;
-  try {
-    // Query to get all resources
-    const resourcesResult = await pool.query(
-      "SELECT * FROM resources WHERE resource_type = $1 AND course = $2 AND year = $3 AND semester = $4 ORDER BY created_at DESC",
-      ["Task", course, year, semester]
-    );
-
-    const resources = resourcesResult.rows;
-
-    // Send both the total count and the list of resources to the frontend
-    res.json({
-      resources,
-    });
-  } catch (err) {
-    console.error("Error fetching resources:", err);
-    res.status(500).json({ message: "Error fetching resources" });
-  }
-});
-
-app.get("/student/papers-resources", async (req, res) => {
-  try {
-    const course = req.session.course;
-    const year = req.session.year;
-    const semester = req.session.semester;
-
-    // Ensure session variables are defined
-    if (!course || !year || !semester) {
-      return res.status(400).json({ message: "Missing session data" });
+    if (!year || !course || !semester) {
+      return res.status(400).json({ message: "Missing user data from token" });
     }
 
-    // Query with additional filters
     const resourcesResult = await pool.query(
       "SELECT * FROM resources WHERE resource_type = $1 AND course = $2 AND year = $3 AND semester = $4 ORDER BY created_at DESC LIMIT 4",
-      ["Past Paper", course, year, semester]
+      ["Notes", course, year, semester]
     );
-
     const resources = resourcesResult.rows;
 
     res.json({ resources });
@@ -776,143 +807,225 @@ app.get("/student/papers-resources", async (req, res) => {
   }
 });
 
-app.get("/student/tasks-resources", async (req, res) => {
+// Route to fetch all notes resources
+app.get("/student/all-notes-resources", async (req, res) => {
+  const token = req.headers["authorization"]?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
+  }
+
   try {
-    // Query to get all resources
-    const year = req.session.year;
-    const course = req.session.course;
-    const semester = req.session.semester;
+    const decoded = await verifyToken(token);
+    const { year, course, semester } = decoded;
+
+    if (!year || !course || !semester) {
+      return res.status(400).json({ message: "Missing user data from token" });
+    }
 
     const resourcesResult = await pool.query(
-      "SELECT * FROM resources WHERE resource_type = $1 AND course = $2 AND year = $3 AND semester = $4 ORDER BY created_at DESC LIMIT 4",
-      ["Task", course, year, semester]
+      "SELECT * FROM resources WHERE resource_type = $1 AND course = $2 AND year = $3 AND semester = $4 ORDER BY created_at DESC",
+      ["Notes", course, year, semester]
     );
-
     const resources = resourcesResult.rows;
 
-    // Send both the total count and the list of resources to the frontend
-    res.json({
-      resources,
-    });
+    res.json({ resources });
   } catch (err) {
     console.error("Error fetching resources:", err);
     res.status(500).json({ message: "Error fetching resources" });
   }
 });
 
-app.get("/resource-adder/check", (req, res) => {
-  if (req.session.role === "admin") {
-    return res.json({ role: "admin" }); // If superadmin, return role as 'admin'
-  } else if (req.session.role === "classRep") {
-    const { course, year, semester } = req.session; // Extract course, year, and semester from session
-    return res.json({
-      role: "classRep",
-      course,
-      year,
-      semester,
+// Route to fetch all papers resources
+app.get("/student/all-papers-resources", async (req, res) => {
+  const token = req.headers["authorization"]?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
+  }
+
+  try {
+    const decoded = await verifyToken(token);
+    const { year, course, semester } = decoded;
+
+    if (!year || !course || !semester) {
+      return res.status(400).json({ message: "Missing user data from token" });
+    }
+
+    const resourcesResult = await pool.query(
+      "SELECT * FROM resources WHERE resource_type = $1 AND course = $2 AND year = $3 AND semester = $4 ORDER BY created_at DESC",
+      ["Past Paper", course, year, semester]
+    );
+    const resources = resourcesResult.rows;
+
+    res.json({ resources });
+  } catch (err) {
+    console.error("Error fetching resources:", err);
+    res.status(500).json({ message: "Error fetching resources" });
+  }
+});
+
+// Route to fetch all tasks resources
+app.get("/student/all-tasks-resources", async (req, res) => {
+  const token = req.headers["authorization"]?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
+  }
+
+  try {
+    const decoded = await verifyToken(token);
+    const { year, course, semester } = decoded;
+
+    if (!year || !course || !semester) {
+      return res.status(400).json({ message: "Missing user data from token" });
+    }
+
+    const resourcesResult = await pool.query(
+      "SELECT * FROM resources WHERE resource_type = $1 AND course = $2 AND year = $3 AND semester = $4 ORDER BY created_at DESC",
+      ["Task", course, year, semester]
+    );
+    const resources = resourcesResult.rows;
+
+    res.json({ resources });
+  } catch (err) {
+    console.error("Error fetching resources:", err);
+    res.status(500).json({ message: "Error fetching resources" });
+  }
+});
+
+// Route to fetch papers resources with a limit
+app.get("/student/papers-resources", async (req, res) => {
+  const token = req.headers["authorization"]?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
+  }
+
+  try {
+    const decoded = await verifyToken(token);
+    const { year, course, semester } = decoded;
+
+    if (!year || !course || !semester) {
+      return res.status(400).json({ message: "Missing user data from token" });
+    }
+
+    const resourcesResult = await pool.query(
+      "SELECT * FROM resources WHERE resource_type = $1 AND course = $2 AND year = $3 AND semester = $4 ORDER BY created_at DESC LIMIT 4",
+      ["Past Paper", course, year, semester]
+    );
+    const resources = resourcesResult.rows;
+
+    res.json({ resources });
+  } catch (err) {
+    console.error("Error fetching resources:", err);
+    res.status(500).json({ message: "Error fetching resources" });
+  }
+});
+
+// Route to fetch tasks resources with a limit
+app.get("/student/tasks-resources", async (req, res) => {
+  const token = req.headers["authorization"]?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
+  }
+
+  try {
+    const decoded = await verifyToken(token);
+    const { year, course, semester } = decoded;
+
+    if (!year || !course || !semester) {
+      return res.status(400).json({ message: "Missing user data from token" });
+    }
+
+    const resourcesResult = await pool.query(
+      "SELECT * FROM resources WHERE resource_type = $1 AND course = $2 AND year = $3 AND semester = $4 ORDER BY created_at DESC LIMIT 4",
+      ["Task", course, year, semester]
+    );
+    const resources = resourcesResult.rows;
+
+    res.json({ resources });
+  } catch (err) {
+    console.error("Error fetching resources:", err);
+    res.status(500).json({ message: "Error fetching resources" });
+  }
+});
+
+const deleteEntity = async (table, id) => {
+  try {
+    const deleteResult = await pool.query(
+      `DELETE FROM ${table} WHERE id = $1 RETURNING *`,
+      [id]
+    );
+    if (deleteResult.rows.length === 0) {
+      throw new Error(`${table.slice(0, -1)} not found`);
+    }
+    return deleteResult.rows[0];
+  } catch (err) {
+    throw new Error(`Error deleting ${table.slice(0, -1)}: ${err.message}`);
+  }
+};
+
+app.delete("/superadmin/:entity/:id", async (req, res) => {
+  const { entity, id } = req.params;
+
+  const tableMap = {
+    classreps: "class_representatives",
+    students: "students",
+    admins: "admins",
+    resources: "resources",
+  };
+
+  const table = tableMap[entity.toLowerCase()];
+  if (!table) {
+    return res.status(400).json({ message: "Invalid entity type" });
+  }
+
+  try {
+    const deletedEntity = await deleteEntity(table, id);
+    res.json({
+      message: `${entity.slice(0, -1)} deleted successfully`,
+      deletedEntity,
     });
-  } else {
-    return res.status(403).json({ message: "Forbidden" }); // Return 403 if not authorized
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ message: err.message });
   }
 });
+app.get("/resource-adder/check", (req, res) => {
+  // Extract token from Authorization header
+  const token = req.headers["authorization"]?.split(" ")[1]; // 'Bearer <token>'
 
-// SuperAdmin Route to delete a class rep
-app.delete("/superadmin/classreps/:id", async (req, res) => {
-  const classRepId = req.params.id;
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
+  }
 
-  try {
-    // Query to delete the class rep by his ID
-    const deleteResult = await pool.query(
-      "DELETE FROM class_representatives WHERE id = $1 RETURNING *",
-      [classRepId]
-    );
-
-    // If no class rep was deleted, return an error
-    if (deleteResult.rows.length === 0) {
-      return res.status(404).json({ message: "Class Rep not found" });
+  // Verify the JWT token
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ message: "Invalid or expired token" });
     }
 
-    // Send a success response
-    res.json({ message: "Class Rep deleted successfully" });
-  } catch (err) {
-    console.error("Error deleting class rep:", err);
-    res.status(500).json({ message: "Error deleting class rep" });
-  }
-});
+    const { role, course, year, semester } = decoded;
 
-// SuperAdmin Route to delete a student
-app.delete("/superadmin/students/:id", async (req, res) => {
-  const studentId = req.params.id;
-
-  try {
-    // Query to delete the class rep by his ID
-    const deleteResult = await pool.query(
-      "DELETE FROM students WHERE id = $1 RETURNING *",
-      [studentId]
-    );
-
-    // If no class rep was deleted, return an error
-    if (deleteResult.rows.length === 0) {
-      return res.status(404).json({ message: "Student not found" });
+    if (!role) {
+      return res.status(403).json({ message: "Forbidden" });
     }
 
-    // Send a success response
-    res.json({ message: "Student deleted successfully" });
-  } catch (err) {
-    console.error("Error deleting Student:", err);
-    res.status(500).json({ message: "Error deleting Student" });
-  }
-});
-
-// SuperAdmin Route to delete an admin
-app.delete("/superadmin/admins/:id", async (req, res) => {
-  const adminId = req.params.id;
-
-  try {
-    // Query to delete the class rep by his ID
-    const deleteResult = await pool.query(
-      "DELETE FROM admins WHERE id = $1 RETURNING *",
-      [adminId]
-    );
-
-    // If no class rep was deleted, return an error
-    if (deleteResult.rows.length === 0) {
-      return res.status(404).json({ message: "Admin not found" });
+    const response = { role };
+    if (role === "classRep") {
+      Object.assign(response, { course, year, semester });
     }
 
-    // Send a success response
-    res.json({ message: "Admin deleted successfully" });
-  } catch (err) {
-    console.error("Error deleting Admin:", err);
-    res.status(500).json({ message: "Error deleting Admin" });
-  }
+    res.json(response);
+  });
 });
 
-// SuperAdmin Route to delete a resource
-app.delete("/superadmin/resources/:id", async (req, res) => {
-  const resourceId = req.params.id;
+const startServer = () => {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+};
 
-  try {
-    // Query to delete the resource by its ID
-    const deleteResult = await pool.query(
-      "DELETE FROM resources WHERE id = $1 RETURNING *",
-      [resourceId]
-    );
-
-    // If no resource was deleted, return an error
-    if (deleteResult.rows.length === 0) {
-      return res.status(404).json({ message: "Resource not found" });
-    }
-
-    // Send a success response
-    res.json({ message: "Resource deleted successfully" });
-  } catch (err) {
-    console.error("Error deleting resource:", err);
-    res.status(500).json({ message: "Error deleting resource" });
-  }
-});
-
-// Start the server
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+startServer();
