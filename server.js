@@ -7,7 +7,7 @@ const bcrypt = require("bcryptjs");
 const path = require("path");
 const multer = require("multer");
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT;
 
 // Initialize database pool
 const pool = new pg.Pool({
