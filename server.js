@@ -83,11 +83,10 @@ const uploadToCloudinary = (fileBuffer, folder) => {
   });
 };
 
-// Create a resource route for Admin
 app.post(
   "/admin/add-resource",
   authenticateToken,
-  upload.single("file"),
+  upload.single("file"), // Use Multer for file upload
   async (req, res) => {
     const {
       title,
@@ -99,16 +98,34 @@ app.post(
       resourceType,
     } = req.body;
 
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ message: "No file uploaded!" });
+    }
+
     try {
-      if (!req.file) {
-        return res.status(400).json({ message: "File upload is required." });
-      }
+      // Upload the file to Cloudinary with resource_type: "auto"
+      const result = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            resource_type: "auto", // Allow all file types
+            folder: "resources", // Specify folder in Cloudinary
+            public_id: file.originalname.split(".")[0], // Use filename without extension
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
 
-      // Upload file to Cloudinary
-      const fileUrl = await uploadToCloudinary(req.file.buffer, "admin-resources");
-      const fileType = path.extname(req.file.originalname).substring(1);
+        uploadStream.end(file.buffer); // Pass the file buffer to the upload stream
+      });
 
-      // Save metadata to the database
+      const fileType = file.originalname.split(".").pop();
+      const fileUrl = result.secure_url;
+
+      // Store file information in the database
       await pool.query(
         "INSERT INTO resources (title, description, year, semester, course, unitcode, filetype, resource_type, file_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
         [
@@ -124,7 +141,7 @@ app.post(
         ]
       );
 
-      res.json({ message: "Resource added successfully!" });
+      res.json({ message: "Resource added successfully!", fileUrl });
     } catch (err) {
       console.error("Error adding resource:", err);
       res.status(500).json({ message: "Error adding resource" });
@@ -132,11 +149,10 @@ app.post(
   }
 );
 
-// Create a resource route for Class Rep
 app.post(
   "/classrep/add-resource",
   authenticateToken,
-  upload.single("file"),
+  upload.single("file"), // Use Multer for file upload
   async (req, res) => {
     const {
       title,
@@ -148,16 +164,34 @@ app.post(
       resourceType,
     } = req.body;
 
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ message: "No file uploaded!" });
+    }
+
     try {
-      if (!req.file) {
-        return res.status(400).json({ message: "File upload is required." });
-      }
+      // Upload the file to Cloudinary with resource_type: "auto"
+      const result = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            resource_type: "auto", // Allow all file types
+            folder: "resources", // Specify folder in Cloudinary
+            public_id: file.originalname.split(".")[0], // Use filename without extension
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
 
-      // Upload file to Cloudinary
-      const fileUrl = await uploadToCloudinary(req.file.buffer, "classrep-resources");
-      const fileType = path.extname(req.file.originalname).substring(1);
+        uploadStream.end(file.buffer); // Pass the file buffer to the upload stream
+      });
 
-      // Save metadata to the database
+      const fileType = file.originalname.split(".").pop();
+      const fileUrl = result.secure_url;
+
+      // Store file information in the database
       await pool.query(
         "INSERT INTO resources (title, description, year, semester, course, unitcode, filetype, resource_type, file_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
         [
@@ -173,13 +207,14 @@ app.post(
         ]
       );
 
-      res.json({ message: "Resource added successfully!" });
+      res.json({ message: "Resource added successfully!", fileUrl });
     } catch (err) {
       console.error("Error adding resource:", err);
       res.status(500).json({ message: "Error adding resource" });
     }
   }
 );
+
 // Register Route
 app.post("/register", async (req, res) => {
   const {
