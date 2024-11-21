@@ -11,8 +11,7 @@ const simpleGit = require('simple-git');
 const multer = require("multer");
 const app = express();
 const streamifier = require("streamifier");
-const cloudinary  = require("cloudinary");
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const { v2: cloudinary } = require("cloudinary");
 const PORT = 5000;
 
 // Initialize database pool
@@ -67,21 +66,8 @@ cloudinary.config({
   api_secret: `${process.env.CLOUD_API_SECRET}`, // Replace with your Cloudinary API secret
 });
 
-// Configure multer-storage-cloudinary
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: async (req, file) => {
-    // Explicitly set the resource type based on file type
-    const fileType = file.mimetype.split("/")[0]; // Check MIME type (e.g., "application")
-    const isDocument = file.mimetype === "application/pdf" || file.mimetype.includes("word");
-
-    return {
-      folder: "resources",
-      resource_type: isDocument ? "raw" : "auto", // Use "raw" for non-image files
-      public_id: `${Date.now()}-${file.originalname}`,
-    };
-  },
-});
+// Configure Multer to store files in memory
+const storage = multer.memoryStorage();
 
 // Configure Multer with Cloudinary storage
 const upload = multer({ storage });
@@ -89,7 +75,7 @@ const upload = multer({ storage });
 app.post(
   "/admin/add-resource",
   authenticateToken,
-  upload.single("file"),
+  upload.single("file"), // Use Multer for file upload
   async (req, res) => {
     const {
       title,
@@ -101,10 +87,34 @@ app.post(
       resourceType,
     } = req.body;
 
-    try {
-      const fileUrl = req.file ? req.file.path : null; // Cloudinary sets the file path
-      const fileType = path.extname(req.file.originalname).substring(1);
+    const file = req.file;
 
+    if (!file) {
+      return res.status(400).json({ message: "No file uploaded!" });
+    }
+
+    try {
+      // Upload the file to Cloudinary directly from memory
+      const result = await cloudinary.uploader.upload_stream(
+        {
+          resource_type: "auto", // Auto-detect file type
+          folder: "resources", // Cloudinary folder
+          public_id: file.originalname.split(".")[0], // Use the filename without extension
+        },
+        (error, result) => {
+          if (error) {
+            throw error;
+          }
+          return result;
+        }
+      );
+
+      const uploadStream = result.pipe(req.file.buffer); // Stream the file buffer to Cloudinary
+
+      const fileType = file.originalname.split(".").pop();
+      const fileUrl = result.secure_url;
+
+      // Store file information in the database
       await pool.query(
         "INSERT INTO resources (title, description, year, semester, course, unitcode, filetype, resource_type, file_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
         [
@@ -119,7 +129,8 @@ app.post(
           fileUrl,
         ]
       );
-      res.json({ message: "Resource added successfully!" });
+
+      res.json({ message: "Resource added successfully!", fileUrl });
     } catch (err) {
       console.error("Error adding resource:", err);
       res.status(500).json({ message: "Error adding resource" });
@@ -130,7 +141,7 @@ app.post(
 app.post(
   "/classrep/add-resource",
   authenticateToken,
-  upload.single("file"),
+  upload.single("file"), // Use Multer for file upload
   async (req, res) => {
     const {
       title,
@@ -142,10 +153,34 @@ app.post(
       resourceType,
     } = req.body;
 
-    try {
-      const fileUrl = req.file ? req.file.path : null; // Cloudinary sets the file path
-      const fileType = path.extname(req.file.originalname).substring(1);
+    const file = req.file;
 
+    if (!file) {
+      return res.status(400).json({ message: "No file uploaded!" });
+    }
+
+    try {
+      // Upload the file to Cloudinary directly from memory
+      const result = await cloudinary.uploader.upload_stream(
+        {
+          resource_type: "auto", // Auto-detect file type
+          folder: "resources", // Cloudinary folder
+          public_id: file.originalname.split(".")[0], // Use the filename without extension
+        },
+        (error, result) => {
+          if (error) {
+            throw error;
+          }
+          return result;
+        }
+      );
+
+      const uploadStream = result.pipe(req.file.buffer); // Stream the file buffer to Cloudinary
+
+      const fileType = file.originalname.split(".").pop();
+      const fileUrl = result.secure_url;
+
+      // Store file information in the database
       await pool.query(
         "INSERT INTO resources (title, description, year, semester, course, unitcode, filetype, resource_type, file_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
         [
@@ -160,7 +195,8 @@ app.post(
           fileUrl,
         ]
       );
-      res.json({ message: "Resource added successfully!" });
+
+      res.json({ message: "Resource added successfully!", fileUrl });
     } catch (err) {
       console.error("Error adding resource:", err);
       res.status(500).json({ message: "Error adding resource" });
