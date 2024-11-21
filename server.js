@@ -5,6 +5,8 @@ const jwt = require("jsonwebtoken");
 const pg = require("pg");
 const bcrypt = require("bcryptjs");
 const path = require("path");
+const fs = require('fs');
+const simpleGit = require('simple-git');
 const multer = require("multer");
 const app = express();
 const PORT = 5000;
@@ -55,16 +57,32 @@ const authenticateToken = (req, res, next) => {
 };
 
 // Configure Multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "./uploads");
-  },
-  filename: (req, file, cb) => {
-    cb(null, file.originalname);
-  },
+const upload = multer({
+  storage: multer.memoryStorage(),
 });
 
-const upload = multer({ storage });
+const pushFileToGitHub = async (fileName, fileBuffer) => {
+  const repoPath = path.join(__dirname, "eduhub-uploads"); // Clone your GitHub repo locally
+  const git = simpleGit(repoPath);
+
+  try {
+    // Write the file to the GitHub repo directory
+    const filePath = path.join(repoPath, fileName);
+    require("fs").writeFileSync(filePath, fileBuffer);
+
+    // Stage, commit, and push the file to GitHub
+    await git.add(fileName);
+    await git.commit(`Add ${fileName}`);
+    await git.push("origin", "main");
+
+    console.log(`✅ File "${fileName}" pushed to GitHub.`);
+    return `https://github.com/Ogero79/eduhub-uploads/raw/main/${fileName}`;
+  } catch (err) {
+    console.error("❌ Error pushing file to GitHub:", err.message);
+    throw err;
+  }
+};
+
 
 // Create a resource route
 app.post(
@@ -81,10 +99,20 @@ app.post(
       unitCode,
       resourceType,
     } = req.body;
-    const fileUrl = req.file ? req.file.path : null;
-    const fileType = path.extname(req.file.originalname).substring(1);
 
     try {
+      if (!req.file) {
+        return res.status(400).json({ message: "File upload is required." });
+      }
+
+      const fileName = req.file.originalname;
+      const fileBuffer = req.file.buffer; // Access the file buffer
+      const fileType = path.extname(fileName).substring(1);
+
+      // Push file to GitHub and get the URL
+      const fileUrl = await pushFileToGitHub(fileName, fileBuffer);
+
+      // Save metadata to the database
       await pool.query(
         "INSERT INTO resources (title, description, year, semester, course, unitcode, filetype, resource_type, file_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
         [
@@ -99,6 +127,7 @@ app.post(
           fileUrl,
         ]
       );
+
       res.json({ message: "Resource added successfully!" });
     } catch (err) {
       console.error("Error adding resource:", err);
@@ -121,10 +150,20 @@ app.post(
       unitCode,
       resourceType,
     } = req.body;
-    const fileUrl = req.file ? req.file.path : null;
-    const fileType = path.extname(req.file.originalname).substring(1);
 
     try {
+      if (!req.file) {
+        return res.status(400).json({ message: "File upload is required." });
+      }
+
+      const fileName = req.file.originalname;
+      const fileBuffer = req.file.buffer; // Access the file buffer
+      const fileType = path.extname(fileName).substring(1);
+
+      // Push file to GitHub and get the URL
+      const fileUrl = await pushFileToGitHub(fileName, fileBuffer);
+
+      // Save metadata to the database
       await pool.query(
         "INSERT INTO resources (title, description, year, semester, course, unitcode, filetype, resource_type, file_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
         [
@@ -139,6 +178,7 @@ app.post(
           fileUrl,
         ]
       );
+
       res.json({ message: "Resource added successfully!" });
     } catch (err) {
       console.error("Error adding resource:", err);
