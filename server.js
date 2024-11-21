@@ -11,7 +11,7 @@ const simpleGit = require('simple-git');
 const multer = require("multer");
 const app = express();
 const streamifier = require("streamifier");
-const { v2: cloudinary } = require("cloudinary");
+const cloudinary = require("cloudinary").v2;
 const PORT = 5000;
 
 // Initialize database pool
@@ -70,18 +70,7 @@ cloudinary.config({
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-// Function to upload file to Cloudinary
-const uploadToCloudinary = (fileBuffer, folder) => {
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      (error, result) => {
-        if (error) return reject(error);
-        resolve(result.secure_url); // Return the secure URL of the uploaded file
-      }
-    );
-    streamifier.createReadStream(fileBuffer).pipe(uploadStream);
-  });
-};
+
 
 app.post(
   "/admin/add-resource",
