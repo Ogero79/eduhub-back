@@ -67,23 +67,33 @@ const upload = multer({
 // Function to upload a file to GitHub
 const uploadFileToGitHub = async (fileName, fileBuffer) => {
   try {
+    console.log(`Starting upload for file: ${fileName}`);
+    
+    // Define local file path
     const localFilePath = path.join(__dirname, fileName);
 
-    // Write the file to the local filesystem temporarily
+    // Write the file locally
     fs.writeFileSync(localFilePath, fileBuffer);
+    console.log(`File written locally at ${localFilePath}`);
 
-    // Use Git commands to add, commit, and push the file
+    // Execute Git commands
     execSync(`git add ${fileName}`);
+    console.log(`File added to Git index: ${fileName}`);
+
     execSync(`git commit -m "Upload ${fileName}"`);
+    console.log(`Committed file with message: "Upload ${fileName}"`);
+
     execSync(`git push`);
+    console.log(`Pushed changes to remote repository`);
 
-    // Delete the local temporary file (optional)
+    // Remove the local temporary file
     fs.unlinkSync(localFilePath);
+    console.log(`Temporary file deleted: ${localFilePath}`);
 
-    // Return the GitHub URL of the uploaded file
+    // Return the GitHub raw URL
     return `https://github.com/Ogero79/eduhub-uploads/raw/main/${fileName}`;
   } catch (error) {
-    console.error("Error uploading file to GitHub:", error);
+    console.error("Error during file upload to GitHub:", error.message);
     throw new Error("File upload to GitHub failed.");
   }
 };
