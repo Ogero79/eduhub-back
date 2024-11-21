@@ -3,13 +3,13 @@ const fs = require("fs");
 require("dotenv").config();
 
 // GitHub configuration
-GITHUB_TOKEN = process.env.GITHUB_TOKEN; // Replace with your token
+const token = process.env.GITHUB_TOKEN; // Replace with your token
 const REPO_OWNER = "Ogero79"; // Your GitHub username
 const REPO_NAME = "eduhub-uploads"; // Repository name
 const BRANCH_NAME = "main"; // Branch where files will be uploaded
 
 // Initialize Octokit (GitHub API client)
-const octokit = new Octokit({ auth: GITHUB_TOKEN });
+const octokit = new Octokit({ auth: token });
 
 // Function to upload a file to GitHub
 const uploadFileToGitHub = async (fileName, fileContent) => {
