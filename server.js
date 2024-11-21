@@ -101,6 +101,15 @@ const uploadFileToGitHub = async (fileName, fileBuffer) => {
       console.log('GitHub remote URL set.');
     }
 
+    // Pull changes from the remote repository to ensure synchronization
+    try {
+      execSync('git pull origin main --rebase', { stdio: 'inherit' });
+      console.log('Successfully pulled remote changes.');
+    } catch (error) {
+      console.error('Error pulling remote changes:', error.message);
+      throw new Error('Failed to pull remote changes.');
+    }
+
     // Add the file to Git index
     execSync(`git add ${safeFilePath}`);
     console.log(`File added to Git index: ${fileName}`);
@@ -124,6 +133,7 @@ const uploadFileToGitHub = async (fileName, fileBuffer) => {
     throw new Error("File upload to GitHub failed.");
   }
 };
+
 // Create a resource route
 app.post(
   "/admin/add-resource",
