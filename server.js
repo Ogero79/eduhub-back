@@ -57,9 +57,7 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
-
 const { v2: cloudinary } = require("cloudinary");
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
 // Configure Cloudinary
 cloudinary.config({
