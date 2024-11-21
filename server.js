@@ -11,7 +11,8 @@ const simpleGit = require('simple-git');
 const multer = require("multer");
 const app = express();
 const streamifier = require("streamifier");
-const { v2: cloudinary } = require("cloudinary");
+const cloudinary  = require("cloudinary");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const PORT = 5000;
 
 // Initialize database pool
@@ -66,24 +67,25 @@ cloudinary.config({
   api_secret: `${process.env.CLOUD_API_SECRET}`, // Replace with your Cloudinary API secret
 });
 
-// Configure Multer to store files in memory
-const storage = multer.memoryStorage();
+// Configure multer-storage-cloudinary
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: async (req, file) => {
+    // Explicitly set the resource type based on file type
+    const fileType = file.mimetype.split("/")[0]; // Check MIME type (e.g., "application")
+    const isDocument = file.mimetype === "application/pdf" || file.mimetype.includes("word");
+
+    return {
+      folder: "resources",
+      resource_type: isDocument ? "raw" : "auto", // Use "raw" for non-image files
+      public_id: `${Date.now()}-${file.originalname}`,
+    };
+  },
+});
+
+// Configure Multer with Cloudinary storage
 const upload = multer({ storage });
 
-// Function to upload file to Cloudinary
-const uploadToCloudinary = (fileBuffer, folder) => {
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      (error, result) => {
-        if (error) return reject(error);
-        resolve(result.secure_url); // Return the secure URL of the uploaded file
-      }
-    );
-    streamifier.createReadStream(fileBuffer).pipe(uploadStream);
-  });
-};
-
-// Create a resource route for Admin
 app.post(
   "/admin/add-resource",
   authenticateToken,
@@ -100,15 +102,9 @@ app.post(
     } = req.body;
 
     try {
-      if (!req.file) {
-        return res.status(400).json({ message: "File upload is required." });
-      }
-
-      // Upload file to Cloudinary
-      const fileUrl = await uploadToCloudinary(req.file.buffer, "admin-resources");
+      const fileUrl = req.file ? req.file.path : null; // Cloudinary sets the file path
       const fileType = path.extname(req.file.originalname).substring(1);
 
-      // Save metadata to the database
       await pool.query(
         "INSERT INTO resources (title, description, year, semester, course, unitcode, filetype, resource_type, file_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
         [
@@ -123,7 +119,6 @@ app.post(
           fileUrl,
         ]
       );
-
       res.json({ message: "Resource added successfully!" });
     } catch (err) {
       console.error("Error adding resource:", err);
@@ -132,7 +127,6 @@ app.post(
   }
 );
 
-// Create a resource route for Class Rep
 app.post(
   "/classrep/add-resource",
   authenticateToken,
@@ -149,15 +143,9 @@ app.post(
     } = req.body;
 
     try {
-      if (!req.file) {
-        return res.status(400).json({ message: "File upload is required." });
-      }
-
-      // Upload file to Cloudinary
-      const fileUrl = await uploadToCloudinary(req.file.buffer, "classrep-resources");
+      const fileUrl = req.file ? req.file.path : null; // Cloudinary sets the file path
       const fileType = path.extname(req.file.originalname).substring(1);
 
-      // Save metadata to the database
       await pool.query(
         "INSERT INTO resources (title, description, year, semester, course, unitcode, filetype, resource_type, file_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
         [
@@ -172,7 +160,6 @@ app.post(
           fileUrl,
         ]
       );
-
       res.json({ message: "Resource added successfully!" });
     } catch (err) {
       console.error("Error adding resource:", err);
@@ -180,7 +167,6 @@ app.post(
     }
   }
 );
-
 // Register Route
 app.post("/register", async (req, res) => {
   const {
