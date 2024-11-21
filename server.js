@@ -76,8 +76,11 @@ const uploadFileToGitHub = async (fileName, fileBuffer) => {
     fs.writeFileSync(localFilePath, fileBuffer);
     console.log(`File written locally at ${localFilePath}`);
 
+    // Safely handle file name with spaces
+    const safeFilePath = `"${localFilePath}"`;
+
     // Execute Git commands
-    execSync(`git add ${fileName}`);
+    execSync(`git add ${safeFilePath}`);
     console.log(`File added to Git index: ${fileName}`);
 
     execSync(`git commit -m "Upload ${fileName}"`);
@@ -91,7 +94,7 @@ const uploadFileToGitHub = async (fileName, fileBuffer) => {
     console.log(`Temporary file deleted: ${localFilePath}`);
 
     // Return the GitHub raw URL
-    return `https://github.com/Ogero79/eduhub-uploads/raw/main/${fileName}`;
+    return `https://github.com/Ogero79/eduhub-uploads/raw/main/${encodeURIComponent(fileName)}`;
   } catch (error) {
     console.error("Error during file upload to GitHub:", error.message);
     throw new Error("File upload to GitHub failed.");
