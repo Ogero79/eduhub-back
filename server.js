@@ -85,52 +85,55 @@ const uploadFileToGitHub = async (fileName, fileBuffer) => {
     fs.writeFileSync(localFilePath, fileBuffer);
     console.log(`File written locally at ${localFilePath}`);
 
-    // Safely handle file name with spaces
-    const safeFilePath = `"${localFilePath}"`;
-
-    // Configure Git with email and username only if not already set
+    // Configure Git
     execSync('git config --global user.email "brianogero@kabarak.ac.ke"');
     execSync('git config --global user.name "Ogero79"');
 
-    // Check if the remote origin already exists and only set it if not
+    // Add remote origin if missing
     try {
       execSync('git remote get-url origin');
-    } catch (error) {
-      // If remote does not exist, add it
-      execSync(`git remote add origin ${GITHUB_REPO_URL}`, { stdio: 'ignore' });
+    } catch {
+      execSync(`git remote add origin https://github.com/Ogero79/eduhub-uploads.git`);
       console.log('GitHub remote URL set.');
     }
 
-    // Pull changes from the remote repository to ensure synchronization
+    // Pull changes with rebase
     try {
       execSync('git pull origin main --rebase', { stdio: 'inherit' });
-      console.log('Successfully pulled remote changes.');
+      console.log('Successfully pulled and rebased remote changes.');
     } catch (error) {
-      console.error('Error pulling remote changes:', error.message);
-      throw new Error('Failed to pull remote changes.');
+      console.error('Error pulling changes:', error.message);
+      throw new Error('Failed to pull remote changes. Resolve conflicts manually.');
     }
 
-    // Add the file to Git index
-    execSync(`git add ${safeFilePath}`);
+    // Add file to Git index
+    execSync(`git add "${localFilePath}"`);
     console.log(`File added to Git index: ${fileName}`);
 
-    // Commit the file
+    // Commit changes
     execSync(`git commit -m "Upload ${fileName}"`);
     console.log(`Committed file with message: "Upload ${fileName}"`);
 
-    // Push the changes to the GitHub repository
-    execSync('git push -u origin main'); // Pushing to the 'main' branch
-    console.log(`Pushed changes to remote repository`);
+    // Push changes
+    try {
+      execSync('git push -u origin main', { stdio: 'inherit' });
+      console.log('Pushed changes to remote repository.');
+    } catch (pushError) {
+      console.error('Error during push:', pushError.message);
 
-    // Remove the local temporary file
+      // Retry with force push (optional)
+      execSync('git push -u origin main --force', { stdio: 'inherit' });
+      console.log('Force-pushed changes to remote repository.');
+    }
+
+    // Remove local temporary file
     fs.unlinkSync(localFilePath);
     console.log(`Temporary file deleted: ${localFilePath}`);
 
-    // Return the GitHub raw URL for accessing the file
     return `https://github.com/Ogero79/eduhub-uploads/raw/main/${encodeURIComponent(fileName)}`;
   } catch (error) {
-    console.error("Error during file upload to GitHub:", error.message);
-    throw new Error("File upload to GitHub failed.");
+    console.error('Error during file upload:', error.message);
+    throw new Error('File upload to GitHub failed.');
   }
 };
 
