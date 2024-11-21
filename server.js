@@ -74,7 +74,6 @@ const upload = multer({ storage });
 const uploadToCloudinary = (fileBuffer, folder) => {
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
-      { eduhub }, // Optional: specify a folder in Cloudinary
       (error, result) => {
         if (error) return reject(error);
         resolve(result.secure_url); // Return the secure URL of the uploaded file
