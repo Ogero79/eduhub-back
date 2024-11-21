@@ -1,8 +1,9 @@
 const { Octokit } = require("@octokit/rest");
 const fs = require("fs");
+require("dotenv").config();
 
 // GitHub configuration
-const GITHUB_TOKEN = "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"; // Replace with your token
+GITHUB_TOKEN = process.env.GITHUB_TOKEN; // Replace with your token
 const REPO_OWNER = "Ogero79"; // Your GitHub username
 const REPO_NAME = "eduhub-uploads"; // Repository name
 const BRANCH_NAME = "main"; // Branch where files will be uploaded
