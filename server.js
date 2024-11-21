@@ -9,8 +9,8 @@ const fs = require('fs');
 const simpleGit = require('simple-git');
 const multer = require("multer");
 const app = express();
+import { exec } from "child_process";
 const PORT = 5000;
-const { uploadFileToGitHub } = require("./githubUpload");
 
 // Initialize database pool
 const pool = new pg.Pool({
@@ -63,6 +63,46 @@ const upload = multer({
 });
 
 
+// Function to upload a file to GitHub
+const uploadFileToGitHub = async (fileName, fileBuffer) => {
+  const repoPath = "https://github.com/Ogero79/eduhub-uploads"; // Replace with the path to your local cloned repository
+
+  try {
+    const filePath = path.join(repoPath, fileName);
+
+    // Write the file buffer to the repository directory
+    fs.writeFileSync(filePath, fileBuffer);
+
+    // Add, commit, and push the file to GitHub
+    await new Promise((resolve, reject) => {
+      exec(
+        `
+        cd ${repoPath} &&
+        git pull origin main &&
+        git add ${fileName} &&
+        git commit -m "Add ${fileName}" &&
+        git push origin main
+        `,
+        (err, stdout, stderr) => {
+          if (err) {
+            console.error("Error pushing to GitHub:", err);
+            reject(err);
+          }
+          resolve(stdout);
+        }
+      );
+    });
+
+    console.log(`File ${fileName} successfully pushed to GitHub.`);
+
+    // Return the GitHub raw file URL
+    return `https://github.com/Ogero79/eduhub-uploads/raw/main/${fileName}`;
+  } catch (err) {
+    console.error("Error uploading file to GitHub:", err);
+    throw err;
+  }
+};
+
 // Create a resource route
 app.post(
   "/admin/add-resource",
@@ -85,7 +125,7 @@ app.post(
       }
 
       const fileName = req.file.originalname;
-      const fileBuffer = req.file.buffer; // Access the file buffer
+      const fileBuffer = req.file.buffer;
       const fileType = path.extname(fileName).substring(1);
 
       // Push file to GitHub and get the URL
@@ -136,7 +176,7 @@ app.post(
       }
 
       const fileName = req.file.originalname;
-      const fileBuffer = req.file.buffer; // Access the file buffer
+      const fileBuffer = req.file.buffer;
       const fileType = path.extname(fileName).substring(1);
 
       // Push file to GitHub and get the URL
@@ -165,6 +205,7 @@ app.post(
     }
   }
 );
+
 
 // Register Route
 app.post("/register", async (req, res) => {
