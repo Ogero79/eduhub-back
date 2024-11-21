@@ -10,6 +10,7 @@ const fs = require('fs');
 const simpleGit = require('simple-git');
 const multer = require("multer");
 const app = express();
+const { execSync } = require("child_process");
 const PORT = 5000;
 
 // Initialize database pool
