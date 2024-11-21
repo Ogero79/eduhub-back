@@ -59,10 +59,14 @@ const authenticateToken = (req, res, next) => {
 };
 
 // Configure Multer for file uploads
-const upload = multer({
-  storage: multer.memoryStorage(),
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+      cb(null, path.join(__dirname, 'eduhub-uploads/uploads'));
+  },
+  filename: function (req, file, cb) {
+      cb(null, Date.now() + '-' + file.originalname);
+  },
 });
-
 
 // Function to upload a file to GitHub
 const uploadFileToGitHub = async (fileName, fileBuffer) => {
