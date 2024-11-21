@@ -80,6 +80,9 @@ const uploadFileToGitHub = async (fileName, fileBuffer) => {
     const safeFilePath = `"${localFilePath}"`;
 
     // Execute Git commands
+    execSync('git config --global user.email "brianogero@kabarak.ac.ke"');
+execSync('git config --global user.name "Ogero79"');
+
     execSync(`git add ${safeFilePath}`);
     console.log(`File added to Git index: ${fileName}`);
 
