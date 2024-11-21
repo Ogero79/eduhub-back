@@ -58,86 +58,34 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Configure Multer for file uploads
-const upload = multer({
-  storage: multer.memoryStorage(),
+const { v2: cloudinary } = require("cloudinary");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: `${process.env.CLOUD_NAME}`, // Replace with your Cloudinary cloud name
+  api_key: `${process.env.CLOUD_API_KEY}`,       // Replace with your Cloudinary API key
+  api_secret: `${process.env.CLOUD_API_SECRET}`, // Replace with your Cloudinary API secret
 });
 
+// Configure Multer to store files in memory
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
-// Ensure the GitHub token is available from environment variables
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-if (!GITHUB_TOKEN) {
-  console.error("GitHub token is not defined in environment variables.");
-  process.exit(1); // Exit if token is not available
-}
-
-const GITHUB_REPO_URL = `https://${GITHUB_TOKEN}@github.com/Ogero79/eduhub-uploads.git`;
-
-// Function to upload a file to GitHub
-const uploadFileToGitHub = async (fileName, fileBuffer) => {
-  try {
-    console.log(`Starting upload for file: ${fileName}`);
-
-    // Define local file path
-    const localFilePath = path.join(__dirname, fileName);
-
-    // Write the file locally in memory (using the buffer)
-    fs.writeFileSync(localFilePath, fileBuffer);
-    console.log(`File written locally at ${localFilePath}`);
-
-    // Configure Git
-    execSync('git config --global user.email "brianogero@kabarak.ac.ke"');
-    execSync('git config --global user.name "Ogero79"');
-
-    // Add remote origin if missing
-    try {
-      execSync('git remote get-url origin');
-    } catch {
-      execSync(`git remote add origin https://github.com/Ogero79/eduhub-uploads.git`);
-      console.log('GitHub remote URL set.');
-    }
-
-    // Pull changes with rebase
-    try {
-      execSync('git pull origin main --rebase', { stdio: 'inherit' });
-      console.log('Successfully pulled and rebased remote changes.');
-    } catch (error) {
-      console.error('Error pulling changes:', error.message);
-      throw new Error('Failed to pull remote changes. Resolve conflicts manually.');
-    }
-
-    // Add file to Git index
-    execSync(`git add "${localFilePath}"`);
-    console.log(`File added to Git index: ${fileName}`);
-
-    // Commit changes
-    execSync(`git commit -m "Upload ${fileName}"`);
-    console.log(`Committed file with message: "Upload ${fileName}"`);
-
-    // Push changes
-    try {
-      execSync('git push -u origin main', { stdio: 'inherit' });
-      console.log('Pushed changes to remote repository.');
-    } catch (pushError) {
-      console.error('Error during push:', pushError.message);
-
-      // Retry with force push (optional)
-      execSync('git push -u origin main --force', { stdio: 'inherit' });
-      console.log('Force-pushed changes to remote repository.');
-    }
-
-    // Remove local temporary file
-    fs.unlinkSync(localFilePath);
-    console.log(`Temporary file deleted: ${localFilePath}`);
-
-    return `https://github.com/Ogero79/eduhub-uploads/raw/main/${encodeURIComponent(fileName)}`;
-  } catch (error) {
-    console.error('Error during file upload:', error.message);
-    throw new Error('File upload to GitHub failed.');
-  }
+// Function to upload file to Cloudinary
+const uploadToCloudinary = (fileBuffer, folder) => {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result.secure_url); // Return the secure URL of the uploaded file
+      }
+    );
+    streamifier.createReadStream(fileBuffer).pipe(uploadStream);
+  });
 };
 
-// Create a resource route
+// Create a resource route for Admin
 app.post(
   "/admin/add-resource",
   authenticateToken,
@@ -158,12 +106,9 @@ app.post(
         return res.status(400).json({ message: "File upload is required." });
       }
 
-      const fileName = req.file.originalname;
-      const fileBuffer = req.file.buffer;
-      const fileType = path.extname(fileName).substring(1);
-
-      // Push the file to GitHub and get the URL
-      const fileUrl = await uploadFileToGitHub(fileName, fileBuffer);
+      // Upload file to Cloudinary
+      const fileUrl = await uploadToCloudinary(req.file.buffer, "admin-resources");
+      const fileType = path.extname(req.file.originalname).substring(1);
 
       // Save metadata to the database
       await pool.query(
@@ -189,7 +134,7 @@ app.post(
   }
 );
 
-// Similar for the Class Rep route
+// Create a resource route for Class Rep
 app.post(
   "/classrep/add-resource",
   authenticateToken,
@@ -210,12 +155,9 @@ app.post(
         return res.status(400).json({ message: "File upload is required." });
       }
 
-      const fileName = req.file.originalname;
-      const fileBuffer = req.file.buffer;
-      const fileType = path.extname(fileName).substring(1);
-
-      // Push the file to GitHub and get the URL
-      const fileUrl = await uploadFileToGitHub(fileName, fileBuffer);
+      // Upload file to Cloudinary
+      const fileUrl = await uploadToCloudinary(req.file.buffer, "classrep-resources");
+      const fileType = path.extname(req.file.originalname).substring(1);
 
       // Save metadata to the database
       await pool.query(
