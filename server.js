@@ -10,6 +10,7 @@ const simpleGit = require('simple-git');
 const multer = require("multer");
 const app = express();
 const PORT = 5000;
+const { uploadFileToGitHub } = require("./githubUpload");
 
 // Initialize database pool
 const pool = new pg.Pool({
@@ -61,28 +62,6 @@ const upload = multer({
   storage: multer.memoryStorage(),
 });
 
-const pushFileToGitHub = async (fileName, fileBuffer) => {
-  const repoPath = path.join(__dirname, "eduhub-uploads"); // Clone your GitHub repo locally
-  const git = simpleGit(repoPath);
-
-  try {
-    // Write the file to the GitHub repo directory
-    const filePath = path.join(repoPath, fileName);
-    require("fs").writeFileSync(filePath, fileBuffer);
-
-    // Stage, commit, and push the file to GitHub
-    await git.add(fileName);
-    await git.commit(`Add ${fileName}`);
-    await git.push("origin", "main");
-
-    console.log(`✅ File "${fileName}" pushed to GitHub.`);
-    return `https://github.com/Ogero79/eduhub-uploads/raw/main/${fileName}`;
-  } catch (err) {
-    console.error("❌ Error pushing file to GitHub:", err.message);
-    throw err;
-  }
-};
-
 
 // Create a resource route
 app.post(
@@ -110,7 +89,7 @@ app.post(
       const fileType = path.extname(fileName).substring(1);
 
       // Push file to GitHub and get the URL
-      const fileUrl = await pushFileToGitHub(fileName, fileBuffer);
+      const fileUrl = await uploadFileToGitHub(fileName, fileBuffer);
 
       // Save metadata to the database
       await pool.query(
@@ -161,7 +140,7 @@ app.post(
       const fileType = path.extname(fileName).substring(1);
 
       // Push file to GitHub and get the URL
-      const fileUrl = await pushFileToGitHub(fileName, fileBuffer);
+      const fileUrl = await uploadFileToGitHub(fileName, fileBuffer);
 
       // Save metadata to the database
       await pool.query(
