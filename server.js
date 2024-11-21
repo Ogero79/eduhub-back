@@ -10,7 +10,8 @@ const fs = require('fs');
 const simpleGit = require('simple-git');
 const multer = require("multer");
 const app = express();
-const { execSync } = require("child_process");
+const streamifier = require("streamifier");
+const { v2: cloudinary } = require("cloudinary");
 const PORT = 5000;
 
 // Initialize database pool
@@ -57,7 +58,6 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
-const { v2: cloudinary } = require("cloudinary");
 
 // Configure Cloudinary
 cloudinary.config({
