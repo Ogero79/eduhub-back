@@ -63,6 +63,16 @@ const upload = multer({
   storage: multer.memoryStorage(),
 });
 
+
+// Ensure the GitHub token is available from environment variables
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+if (!GITHUB_TOKEN) {
+  console.error("GitHub token is not defined in environment variables.");
+  process.exit(1); // Exit if token is not available
+}
+
+const GITHUB_REPO_URL = `https://${GITHUB_TOKEN}@github.com/Ogero79/eduhub-uploads.git`;
+
 // Function to upload a file to GitHub
 const uploadFileToGitHub = async (fileName, fileBuffer) => {
   try {
@@ -82,8 +92,14 @@ const uploadFileToGitHub = async (fileName, fileBuffer) => {
     execSync('git config --global user.email "brianogero@kabarak.ac.ke"');
     execSync('git config --global user.name "Ogero79"');
 
-    // Ensure the correct Git remote is set
-    execSync('git remote add origin https://github.com/Ogero79/eduhub-uploads.git', { stdio: 'ignore' });
+    // Check if the remote origin already exists and only set it if not
+    try {
+      execSync('git remote get-url origin');
+    } catch (error) {
+      // If remote does not exist, add it
+      execSync(`git remote add origin ${GITHUB_REPO_URL}`, { stdio: 'ignore' });
+      console.log('GitHub remote URL set.');
+    }
 
     // Add the file to Git index
     execSync(`git add ${safeFilePath}`);
@@ -108,7 +124,6 @@ const uploadFileToGitHub = async (fileName, fileBuffer) => {
     throw new Error("File upload to GitHub failed.");
   }
 };
-
 // Create a resource route
 app.post(
   "/admin/add-resource",
