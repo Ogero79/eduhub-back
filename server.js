@@ -65,41 +65,25 @@ const upload = multer({
 
 // Function to upload a file to GitHub
 const uploadFileToGitHub = async (fileName, fileBuffer) => {
-  const repoPath = "https://github.com/Ogero79/eduhub-uploads"; // Replace with the path to your local cloned repository
-
   try {
-    const filePath = path.join(repoPath, fileName);
+    const localFilePath = path.join(__dirname, fileName);
 
-    // Write the file buffer to the repository directory
-    fs.writeFileSync(filePath, fileBuffer);
+    // Write the file to the local filesystem temporarily
+    fs.writeFileSync(localFilePath, fileBuffer);
 
-    // Add, commit, and push the file to GitHub
-    await new Promise((resolve, reject) => {
-      exec(
-        `
-        cd ${repoPath} &&
-        git pull origin main &&
-        git add ${fileName} &&
-        git commit -m "Add ${fileName}" &&
-        git push origin main
-        `,
-        (err, stdout, stderr) => {
-          if (err) {
-            console.error("Error pushing to GitHub:", err);
-            reject(err);
-          }
-          resolve(stdout);
-        }
-      );
-    });
+    // Use Git commands to add, commit, and push the file
+    execSync(`git add ${fileName}`);
+    execSync(`git commit -m "Upload ${fileName}"`);
+    execSync(`git push`);
 
-    console.log(`File ${fileName} successfully pushed to GitHub.`);
+    // Delete the local temporary file (optional)
+    fs.unlinkSync(localFilePath);
 
-    // Return the GitHub raw file URL
+    // Return the GitHub URL of the uploaded file
     return `https://github.com/Ogero79/eduhub-uploads/raw/main/${fileName}`;
-  } catch (err) {
-    console.error("Error uploading file to GitHub:", err);
-    throw err;
+  } catch (error) {
+    console.error("Error uploading file to GitHub:", error);
+    throw new Error("File upload to GitHub failed.");
   }
 };
 
