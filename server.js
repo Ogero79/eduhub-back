@@ -59,48 +59,49 @@ const authenticateToken = (req, res, next) => {
 };
 
 // Configure Multer for file uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-      cb(null, path.join(__dirname, 'eduhub-uploads/uploads'));
-  },
-  filename: function (req, file, cb) {
-      cb(null, Date.now() + '-' + file.originalname);
-  },
+const upload = multer({
+  storage: multer.memoryStorage(),
 });
 
 // Function to upload a file to GitHub
 const uploadFileToGitHub = async (fileName, fileBuffer) => {
   try {
     console.log(`Starting upload for file: ${fileName}`);
-    
+
     // Define local file path
     const localFilePath = path.join(__dirname, fileName);
 
-    // Write the file locally
+    // Write the file locally in memory (using the buffer)
     fs.writeFileSync(localFilePath, fileBuffer);
     console.log(`File written locally at ${localFilePath}`);
 
     // Safely handle file name with spaces
     const safeFilePath = `"${localFilePath}"`;
 
-    // Execute Git commands
+    // Configure Git with email and username only if not already set
     execSync('git config --global user.email "brianogero@kabarak.ac.ke"');
     execSync('git config --global user.name "Ogero79"');
 
+    // Ensure the correct Git remote is set
+    execSync('git remote add origin https://github.com/Ogero79/eduhub-uploads.git', { stdio: 'ignore' });
+
+    // Add the file to Git index
     execSync(`git add ${safeFilePath}`);
     console.log(`File added to Git index: ${fileName}`);
 
+    // Commit the file
     execSync(`git commit -m "Upload ${fileName}"`);
     console.log(`Committed file with message: "Upload ${fileName}"`);
 
-    execSync(`git push`);
+    // Push the changes to the GitHub repository
+    execSync('git push -u origin main'); // Pushing to the 'main' branch
     console.log(`Pushed changes to remote repository`);
 
     // Remove the local temporary file
     fs.unlinkSync(localFilePath);
     console.log(`Temporary file deleted: ${localFilePath}`);
 
-    // Return the GitHub raw URL
+    // Return the GitHub raw URL for accessing the file
     return `https://github.com/Ogero79/eduhub-uploads/raw/main/${encodeURIComponent(fileName)}`;
   } catch (error) {
     console.error("Error during file upload to GitHub:", error.message);
@@ -133,7 +134,7 @@ app.post(
       const fileBuffer = req.file.buffer;
       const fileType = path.extname(fileName).substring(1);
 
-      // Push file to GitHub and get the URL
+      // Push the file to GitHub and get the URL
       const fileUrl = await uploadFileToGitHub(fileName, fileBuffer);
 
       // Save metadata to the database
@@ -160,6 +161,7 @@ app.post(
   }
 );
 
+// Similar for the Class Rep route
 app.post(
   "/classrep/add-resource",
   authenticateToken,
@@ -184,7 +186,7 @@ app.post(
       const fileBuffer = req.file.buffer;
       const fileType = path.extname(fileName).substring(1);
 
-      // Push file to GitHub and get the URL
+      // Push the file to GitHub and get the URL
       const fileUrl = await uploadFileToGitHub(fileName, fileBuffer);
 
       // Save metadata to the database
@@ -210,7 +212,6 @@ app.post(
     }
   }
 );
-
 
 // Register Route
 app.post("/register", async (req, res) => {
