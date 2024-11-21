@@ -1,14 +1,15 @@
 const { exec } = require("child_process");
-const dotenv = require("dotenv").config();
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const pg = require("pg");
 const bcrypt = require("bcryptjs");
 const path = require("path");
-const fs = require("fs");
-const simpleGit = require("simple-git");
+const fs = require('fs');
+const simpleGit = require('simple-git');
 const multer = require("multer");
+const app = express();
 const PORT = 5000;
 
 // Initialize database pool
