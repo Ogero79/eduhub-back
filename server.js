@@ -70,139 +70,85 @@ cloudinary.config({
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
+const uploadFileToCloudinary = async (file) => {
+  return new Promise((resolve, reject) => {
+    const uniqueName = `${Date.now()}-${file.originalname.split(".")[0]}`;
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        resource_type: "auto", // Supports all file types
+        folder: "eduhub",
+        public_id: uniqueName, // Ensures unique public ID
+      },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result);
+      }
+    );
+    uploadStream.end(file.buffer);
+  });
+};
 
+const addResource = async (req, res) => {
+  const {
+    title,
+    description,
+    year,
+    semester,
+    course,
+    unitCode,
+    resourceType,
+  } = req.body;
+
+  const file = req.file;
+
+  if (!file) {
+    return res.status(400).json({ message: "No file uploaded!" });
+  }
+
+  try {
+    // Upload file to Cloudinary
+    const result = await uploadFileToCloudinary(file);
+
+    const fileType = file.originalname.split(".").pop();
+    const fileUrl = result.secure_url;
+
+    // Store file information in the database
+    await pool.query(
+      "INSERT INTO resources (title, description, year, semester, course, unitcode, filetype, resource_type, file_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+      [
+        title,
+        description,
+        year,
+        semester,
+        course,
+        unitCode,
+        fileType,
+        resourceType,
+        fileUrl,
+      ]
+    );
+
+    res.json({ message: "Resource added successfully!", fileUrl });
+  } catch (err) {
+    console.error("Error adding resource:", err.message || err);
+    res.status(500).json({ message: "Error adding resource", error: err.message });
+  }
+};
 
 app.post(
   "/admin/add-resource",
   authenticateToken,
-  upload.single("file"), // Use Multer for file upload
-  async (req, res) => {
-    const {
-      title,
-      description,
-      year,
-      semester,
-      course,
-      unitCode,
-      resourceType,
-    } = req.body;
-
-    const file = req.file;
-
-    if (!file) {
-      return res.status(400).json({ message: "No file uploaded!" });
-    }
-
-    try {
-      // Upload the file to Cloudinary with resource_type: "auto"
-      const result = await new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          {
-            resource_type: "auto", // Allow all file types
-            folder: "resources", // Specify folder in Cloudinary
-            public_id: file.originalname.split(".")[0], // Use filename without extension
-          },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
-        );
-
-        uploadStream.end(file.buffer); // Pass the file buffer to the upload stream
-      });
-
-      const fileType = file.originalname.split(".").pop();
-      const fileUrl = result.secure_url;
-
-      // Store file information in the database
-      await pool.query(
-        "INSERT INTO resources (title, description, year, semester, course, unitcode, filetype, resource_type, file_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-        [
-          title,
-          description,
-          year,
-          semester,
-          course,
-          unitCode,
-          fileType,
-          resourceType,
-          fileUrl,
-        ]
-      );
-
-      res.json({ message: "Resource added successfully!", fileUrl });
-    } catch (err) {
-      console.error("Error adding resource:", err);
-      res.status(500).json({ message: "Error adding resource" });
-    }
-  }
+  upload.single("file"),
+  addResource // Reuse the logic
 );
 
 app.post(
   "/classrep/add-resource",
   authenticateToken,
-  upload.single("file"), // Use Multer for file upload
-  async (req, res) => {
-    const {
-      title,
-      description,
-      year,
-      semester,
-      course,
-      unitCode,
-      resourceType,
-    } = req.body;
-
-    const file = req.file;
-
-    if (!file) {
-      return res.status(400).json({ message: "No file uploaded!" });
-    }
-
-    try {
-      // Upload the file to Cloudinary with resource_type: "auto"
-      const result = await new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          {
-            resource_type: "auto", // Allow all file types
-            folder: "resources", // Specify folder in Cloudinary
-            public_id: file.originalname.split(".")[0], // Use filename without extension
-          },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
-        );
-
-        uploadStream.end(file.buffer); // Pass the file buffer to the upload stream
-      });
-
-      const fileType = file.originalname.split(".").pop();
-      const fileUrl = result.secure_url;
-
-      // Store file information in the database
-      await pool.query(
-        "INSERT INTO resources (title, description, year, semester, course, unitcode, filetype, resource_type, file_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-        [
-          title,
-          description,
-          year,
-          semester,
-          course,
-          unitCode,
-          fileType,
-          resourceType,
-          fileUrl,
-        ]
-      );
-
-      res.json({ message: "Resource added successfully!", fileUrl });
-    } catch (err) {
-      console.error("Error adding resource:", err);
-      res.status(500).json({ message: "Error adding resource" });
-    }
-  }
+  upload.single("file"),
+  addResource // Reuse the logic
 );
+
 
 // Register Route
 app.post("/register", async (req, res) => {
