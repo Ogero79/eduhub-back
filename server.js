@@ -73,15 +73,16 @@ const upload = multer({ storage });
 const uploadFileToCloudinary = async (file) => {
   return new Promise((resolve, reject) => {
     const fileExtension = file.originalname.split(".").pop().toLowerCase(); // Extract file extension
-    const uniqueName = `${Date.now()}-${file.originalname.replace(/\s/g, "_")}`; // Replace spaces with underscores
+    const uniqueName = `${Date.now()}-${file.originalname.replace(/\s/g, "_")}`; // Use a unique name with underscores
 
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         resource_type: ["pdf", "doc", "docx", "ppt", "txt"].includes(fileExtension)
           ? "raw"
-          : "auto", // Use "raw" for documents, "auto" for media files
-        folder: "resources", // Cloudinary folder
-        public_id: uniqueName.split(".")[0], // Use filename without extension
+          : "auto", // Use "raw" for non-media files
+        folder: "resources", // Specify Cloudinary folder
+        public_id: uniqueName, // Include extension for clarity
+        format: fileExtension, // Explicitly set format (ensures extension is respected)
       },
       (error, result) => {
         if (error) reject(error);
@@ -89,7 +90,7 @@ const uploadFileToCloudinary = async (file) => {
       }
     );
 
-    uploadStream.end(file.buffer); // Send the file buffer to the upload stream
+    uploadStream.end(file.buffer); // Send file buffer
   });
 };
 
@@ -114,7 +115,7 @@ const addResource = async (req, res) => {
     // Upload file to Cloudinary
     const result = await uploadFileToCloudinary(file);
 
-    const fileType = file.originalname.split(".").pop().toLowerCase(); // Get file extension
+    const fileType = file.originalname.split(".").pop().toLowerCase(); // Extract file extension
     const fileUrl = result.secure_url;
 
     // Store file information in the database
@@ -139,6 +140,7 @@ const addResource = async (req, res) => {
     res.status(500).json({ message: "Error adding resource", error: err.message });
   }
 };
+
 
 
 app.post(
