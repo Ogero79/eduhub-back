@@ -73,7 +73,7 @@ const upload = multer({ storage });
 const uploadFileToCloudinary = async (file) => {
   return new Promise((resolve, reject) => {
     const fileExtension = file.originalname.split(".").pop().toLowerCase(); // Extract file extension
-    const uniqueName = `${Date.now()}-${file.originalname.replace(/\s/g, "_")}`; // Use a unique name with underscores
+    const uniqueName = `${file.originalname.replace(/\s/g, "_")}`; // Use a unique name with underscores
 
     const uploadStream = cloudinary.uploader.upload_stream(
       {
