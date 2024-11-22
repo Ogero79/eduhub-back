@@ -72,12 +72,18 @@ const upload = multer({ storage });
 
 const uploadFileToCloudinary = async (file) => {
   return new Promise((resolve, reject) => {
-    const uniqueName = `${Date.now()}-${file.originalname.split(".")[0]}`;
+    const originalExtension = file.originalname.split(".").pop();
+    const uniqueName = `${Date.now()}-${file.originalname.split(".")[0]}.${originalExtension}`; // Include extension in public_id
+
+    const resourceType = ["pdf", "doc", "docx", "txt"].includes(originalExtension.toLowerCase())
+      ? "raw"
+      : "auto";
+
     const uploadStream = cloudinary.uploader.upload_stream(
       {
-        resource_type: "auto", // Supports all file types
-        folder: "eduhub",
-        public_id: uniqueName, // Ensures unique public ID
+        resource_type: resourceType,
+        folder: "resources",
+        public_id: uniqueName,
       },
       (error, result) => {
         if (error) reject(error);
