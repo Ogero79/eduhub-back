@@ -72,12 +72,10 @@ const upload = multer({ storage });
 
 const uploadFileToCloudinary = async (file) => {
   return new Promise((resolve, reject) => {
-    const originalExtension = file.originalname.split(".").pop();
-    const uniqueName = `${Date.now()}-${file.originalname.split(".")[0]}.${originalExtension}`; // Include extension in public_id
+    const fileExtension = file.originalname.split(".").pop().toLowerCase();
+    const resourceType = fileExtension === "pdf" ? "raw" : "auto"; // Use "raw" for PDFs
 
-    const resourceType = ["pdf", "doc", "docx", "txt"].includes(originalExtension.toLowerCase())
-      ? "raw"
-      : "auto";
+    const uniqueName = `${Date.now()}-${file.originalname.split(".")[0]}`;
 
     const uploadStream = cloudinary.uploader.upload_stream(
       {
@@ -90,9 +88,11 @@ const uploadFileToCloudinary = async (file) => {
         else resolve(result);
       }
     );
+
     uploadStream.end(file.buffer);
   });
 };
+
 
 const addResource = async (req, res) => {
   const {
