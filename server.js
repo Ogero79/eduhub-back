@@ -269,7 +269,7 @@ app.post("/login", async (req, res) => {
       const token = jwt.sign(
         { email, role: "superadmin" }, // Payload containing user info
         process.env.JWT_SECRET, // Secret key to sign the JWT
-        { expiresIn: "1h" } // Token expiration (1 hour)
+        { expiresIn: "30d" } // Token expiration (1 hour)
       );
 
       return res.json({
@@ -304,7 +304,7 @@ app.post("/login", async (req, res) => {
             semester: classRep.semester,
           },
           process.env.JWT_SECRET,
-          { expiresIn: "1h" }
+          { expiresIn: "30d" }
         );
 
         return res.json({
@@ -339,7 +339,7 @@ app.post("/login", async (req, res) => {
             lastName: admin.last_name,
           },
           process.env.JWT_SECRET,
-          { expiresIn: "1h" }
+          { expiresIn: "30d" }
         );
 
         return res.json({
@@ -377,7 +377,7 @@ app.post("/login", async (req, res) => {
             semester: student.semester,
           },
           process.env.JWT_SECRET,
-          { expiresIn: "1h" }
+          { expiresIn: "30d" }
         );
 
         return res.json({
