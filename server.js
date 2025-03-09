@@ -550,6 +550,7 @@ app.put("/user/profile", async (req, res) => {
       const newToken = jwt.sign(
         {
           id: user.id,
+          role: user.user_role,  // ✅ Add this to match the login token
           email: user.email,
           firstName: user.first_name,
           lastName: user.last_name,
@@ -561,6 +562,7 @@ app.put("/user/profile", async (req, res) => {
         process.env.JWT_SECRET,
         { expiresIn: "30d" }
       );
+      
 
       res.json({
         message: "Profile updated successfully",
@@ -582,101 +584,6 @@ const verifyToken = (token) => {
     });
   });
 };
-
-const deleteEntity = async (table, id) => {
-  try {
-    const deleteResult = await pool.query(
-      `DELETE FROM ${table} WHERE id = $1 RETURNING *`,
-      [id]
-    );
-    if (deleteResult.rows.length === 0) {
-      throw new Error(`${table.slice(0, -1)} not found`);
-    }
-    return deleteResult.rows[0];
-  } catch (err) {
-    throw new Error(`Error deleting ${table.slice(0, -1)}: ${err.message}`);
-  }
-};
-
-app.delete("/superadmin/:entity/:id", async (req, res) => {
-  const { entity, id } = req.params;
-
-  const tableMap = {
-    classreps: "class_representatives",
-    students: "students",
-    admins: "admins",
-    resources: "resources",
-  };
-
-  const table = tableMap[entity.toLowerCase()];
-  if (!table) {
-    return res.status(400).json({ message: "Invalid entity type" });
-  }
-
-  try {
-    const deletedEntity = await deleteEntity(table, id);
-    res.json({
-      message: `${entity.slice(0, -1)} deleted successfully`,
-      deletedEntity,
-    });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ message: err.message });
-  }
-});
-
-app.delete("/superadmin/:entity/:id", async (req, res) => {
-  const { entity, id } = req.params;
-
-  const tableMap = {
-    classreps: "class_representatives",
-    students: "students",
-    admins: "admins",
-    resources: "resources",
-  };
-
-  const table = tableMap[entity.toLowerCase()];
-  if (!table) {
-    return res.status(400).json({ message: "Invalid entity type" });
-  }
-
-  try {
-    const deletedEntity = await deleteEntity(table, id);
-    res.json({
-      message: `${entity.slice(0, -1)} deleted successfully`,
-      deletedEntity,
-    });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ message: err.message });
-  }
-});
-app.get("/resource-adder/check", (req, res) => {
-  const token = req.headers["authorization"]?.split(" ")[1];
-
-  if (!token) {
-    return res.status(401).json({ message: "No token provided" });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-    if (err) {
-      return res.status(403).json({ message: "Invalid or expired token" });
-    }
-
-    const { role, course, year, semester } = decoded;
-
-    if (!role) {
-      return res.status(403).json({ message: "Forbidden" });
-    }
-
-    const response = { role };
-    if (role === "classRep") {
-      Object.assign(response, { course, year, semester });
-    }
-
-    res.json(response);
-  });
-});
 
 app.put("/students/:studentId/change-password", async (req, res) => {
   const { studentId } = req.params;

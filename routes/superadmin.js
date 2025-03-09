@@ -110,5 +110,25 @@ router.get("/students", async (req, res) => {
   }
 });
 
+router.delete("/students/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const deleteResult = await pool.query(
+      `DELETE FROM students WHERE id = $1 RETURNING *`,
+      [id]
+    );
+    if (deleteResult.rows.length === 0) {
+      return res.status(404).json({ error: "student not found" });
+    }
+    res.json({
+      message: "Student deleted successfully",
+    });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 
 module.exports = router;
