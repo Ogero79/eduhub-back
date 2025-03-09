@@ -348,7 +348,7 @@ app.get("/dashboard", (req, res) => {
       return res.status(403).json({ message: "Invalid or expired token" });
     }
 
-    const { id, role, course, courseId, firstName, year, semester } = decoded;
+    const { id, role, course, courseId, firstName, lastName, year, semester } = decoded;
 
     if (role !== "student" && role !== "classRep") {
       return res.status(403).json({
@@ -359,6 +359,7 @@ app.get("/dashboard", (req, res) => {
     res.json({
       id,
       firstName,
+      lastName,
       courseId,
       role,
       course,
