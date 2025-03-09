@@ -147,7 +147,7 @@ router.get("/details/:unitId", async (req, res) => {
       SELECT resource_id, title, description, link, upload_date, file_type, resource_type 
       FROM resources 
       WHERE unit_id = $1
-      ORDER BY upload_date DESC
+      ORDER BY upload_date ASC
     `;
     const resourcesResult = await pool.query(resourcesQuery, [unitId]);
 
