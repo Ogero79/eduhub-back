@@ -501,119 +501,78 @@ app.put("/user/profile", async (req, res) => {
       return res.status(403).json({ message: "Invalid or expired token" });
     }
 
-    const { email, role } = decoded;
+    const { email } = decoded;
     const { firstName, lastName, course, year, semester } = req.body;
-    const courseResult = await pool.query(
-      "SELECT course_id FROM courses WHERE course_name = $1",
-      [course]
-    );
-
-    if (courseResult.rows.length === 0) {
-      return res.status(404).json({ error: "Course not found" });
-    }
-
-    const course_id = courseResult.rows[0].course_id;
-    const roleConfig = {
-      student: {
-        table: "students",
-        columns:
-          "first_name = $1, last_name = $2, course_id = $3, year = $4, semester = $5",
-        values: [firstName, lastName, course_id, year, semester, email],
-      },
-      classRep: {
-        table: "class_representatives",
-        columns:
-          "first_name = $1, last_name = $2, course_id = $3, year = $4, semester = $5",
-        values: [firstName, lastName, course_id, year, semester, email],
-      },
-      admin: {
-        table: "admins",
-        columns: "first_name = $1, last_name = $2",
-        values: [firstName, lastName, email],
-      },
-    };
-
-    const config = roleConfig[role];
-    if (!config) {
-      return res.status(403).json({ message: "Unauthorized role" });
-    }
 
     try {
-      const query = `
-        UPDATE ${config.table}
-        SET ${config.columns}
-        WHERE email = $${config.values.length}
+      // Fetch course ID
+      const courseResult = await pool.query(
+        "SELECT course_id FROM courses WHERE course_name = $1",
+        [course]
+      );
+
+      if (courseResult.rows.length === 0) {
+        return res.status(404).json({ error: "Course not found" });
+      }
+
+      const course_id = courseResult.rows[0].course_id;
+
+      // Update student profile
+      const updateQuery = `
+        UPDATE students
+        SET first_name = $1, last_name = $2, course_id = $3, year = $4, semester = $5
+        WHERE email = $6
         RETURNING *;
       `;
 
-      const result = await pool.query(query, config.values);
+      const result = await pool.query(updateQuery, [
+        firstName,
+        lastName,
+        course_id,
+        year,
+        semester,
+        email,
+      ]);
 
       if (result.rowCount === 0) {
         return res.status(404).json({ message: "User not found" });
       }
 
-      if (role === "student") {
-        const studentResult = await pool.query(
-          "SELECT s.*, c.course_name FROM students s LEFT JOIN courses c ON s.course_id = c.course_id WHERE s.email = $1",
-          [email]
-        );
+      // Retrieve updated user details
+      const userResult = await pool.query(
+        "SELECT s.*, c.course_name FROM students s LEFT JOIN courses c ON s.course_id = c.course_id WHERE s.email = $1",
+        [email]
+      );
 
-        student = studentResult.rows[0];
-        const token = jwt.sign(
-          {
-            id: student.id,
-            role: "student",
-            email: student.email,
-            firstName: student.first_name,
-            lastName: student.last_name,
-            course: student.course_name,
-            courseId: student.course_id,
-            year: student.year,
-            semester: student.semester,
-          },
-          process.env.JWT_SECRET,
-          { expiresIn: "30d" }
-        );
+      const user = userResult.rows[0];
 
-        res.json({
-          message: "profile updated successfully",
-          token,
-        });
-      }
-      if (role === "classRep") {
-        const classRepResult = await pool.query(
-          "SELECT cr.*, c.course_name FROM class_representatives cr LEFT JOIN courses c ON cr.course_id = c.course_id WHERE cr.email = $1;",
-          [email]
-        );
+      // Generate a new JWT token with updated data
+      const newToken = jwt.sign(
+        {
+          id: user.id,
+          email: user.email,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          course: user.course_name,
+          courseId: user.course_id,
+          year: user.year,
+          semester: user.semester,
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: "30d" }
+      );
 
-        const classRep = classRepResult.rows[0];
-        const token = jwt.sign(
-          {
-            id: classRep.id,
-            role: "classRep",
-            email: classRep.email,
-            firstName: classRep.first_name,
-            lastName: classRep.last_name,
-            year: classRep.year,
-            course: classRep.course_name,
-            courseId: classRep.course_id,
-            semester: classRep.semester,
-          },
-          process.env.JWT_SECRET,
-          { expiresIn: "30d" }
-        );
-
-        res.json({
-          message: "profile updated successfully",
-          token,
-        });
-      }
+      res.json({
+        message: "Profile updated successfully",
+        token: newToken,
+      });
     } catch (err) {
       console.error("Error updating profile:", err);
       res.status(500).json({ message: "Error updating profile" });
     }
   });
 });
+
 
 const verifyToken = (token) => {
   return new Promise((resolve, reject) => {
