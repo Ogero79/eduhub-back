@@ -268,6 +268,7 @@ app.post("/login", async (req, res) => {
       });
     }
 
+    
     // Check if student exists
     const studentResult = await pool.query(
       "SELECT id, first_name, last_name, email, password, course_id, year, semester, user_role FROM students WHERE email = $1",
@@ -286,6 +287,16 @@ app.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
+    const courseResult = await pool.query(
+      "SELECT course_name FROM courses WHERE course_id = $1",
+      [student.course_id]
+    );
+
+    if (courseResult.rows.length === 0) {
+      return res.status(404).json({ error: "Course not found" });
+    }
+
+    const course = courseResult.rows[0].course_name;
     // Generate JWT token
     const token = jwt.sign(
       {
@@ -295,6 +306,7 @@ app.post("/login", async (req, res) => {
         firstName: student.first_name,
         lastName: student.last_name,
         courseId: student.course_id,
+        course,
         year: student.year,
         semester: student.semester,
       },
